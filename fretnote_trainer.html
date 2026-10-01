@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FretNote Trainer - Treine as cordas da sua guitarra</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0f172a',
+                        cardBg: '#1e293b',
+                        accentGlow: '#38bdf8',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom smooth pulse glow effect */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
+            50% { box-shadow: 0 0 30px rgba(56, 189, 248, 0.5); }
+        }
+        .glow-box {
+            animation: pulseGlow 3s infinite ease-in-out;
+        }
+        /* Shake animation for incorrect answer */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .animate-shake {
+            animation: shake 0.4s ease-in-out;
+        }
+        /* Pop animation for correct answer */
+        @keyframes popUp {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: popUp 0.3s ease-in-out;
+        }
+        /* Answer buttons state */
+        .string-btn.is-correct { background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #6ee7b7; }
+        .string-btn.is-wrong { background: rgba(244, 63, 94, 0.2); border-color: #f43f5e; color: #fda4af; }
+    </style>
+</head>
+<body class="bg-darkBg text-slate-100 min-h-screen flex flex-col justify-between selection:bg-sky-500 selection:text-white">
+
+    <header class="w-full border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/30">
+                    <i class="fa-solid fa-guitar text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">FretNote Trainer</h1>
+                    <p class="text-xs text-slate-400">Estilo Código Morse para Guitarristas</p>
+                </div>
+            </div>
+
+            <!-- Global Action Controls -->
+            <div class="flex items-center gap-2">
+                <button id="btnSoundToggle" onclick="toggleSound()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition flex items-center gap-2 border border-slate-700" title="Ativar/Desativar som das cordas">
+                    <i id="soundIcon" class="fa-solid fa-volume-high text-sky-400"></i>
+                    <span id="soundText" class="hidden sm:inline">Cordas On</span>
+                </button>
+                <button id="btnEffectsToggle" onclick="toggleEffects()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition flex items-center gap-2 border border-slate-700" title="Ativar/Desativar sons de acerto e erro">
+                    <i id="effectsIcon" class="fa-solid fa-bell text-sky-400"></i>
+                    <span id="effectsText" class="hidden sm:inline">Efeitos On</span>
+                </button>
+                <button onclick="openInfoModal()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition flex items-center gap-2 border border-slate-700">
+                    <i class="fa-solid fa-circle-question text-sky-400"></i>
+                    <span class="hidden sm:inline">Como Jogar</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-8 flex flex-col justify-center items-center">
+
+        <!-- Scoreboard Bar -->
+        <div class="grid grid-cols-4 gap-2 sm:gap-4 w-full mb-8">
+            <div class="bg-cardBg border border-slate-800/80 rounded-2xl p-3 text-center shadow-md">
+                <div class="text-xs text-slate-400 font-medium mb-1">Acertos</div>
+                <div id="statCorrect" class="mono-font text-lg sm:text-2xl font-bold text-emerald-400">0</div>
+            </div>
+            <div class="bg-cardBg border border-slate-800/80 rounded-2xl p-3 text-center shadow-md">
+                <div class="text-xs text-slate-400 font-medium mb-1">Erros</div>
+                <div id="statWrong" class="mono-font text-lg sm:text-2xl font-bold text-rose-400">0</div>
+            </div>
+            <div class="bg-cardBg border border-slate-800/80 rounded-2xl p-3 text-center shadow-md">
+                <div class="text-xs text-slate-400 font-medium mb-1">Sequência</div>
+                <div id="statStreak" class="mono-font text-lg sm:text-2xl font-bold text-amber-400">0</div>
+            </div>
+            <div class="bg-cardBg border border-slate-800/80 rounded-2xl p-3 text-center shadow-md">
+                <div class="text-xs text-slate-400 font-medium mb-1">Precisão</div>
+                <div id="statAccuracy" class="mono-font text-lg sm:text-2xl font-bold text-sky-400">100%</div>
+            </div>
+        </div>
+
+        <!-- Main Challenge Arena Card -->
+        <div id="gameCard" class="w-full bg-cardBg border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl glow-box transition-all duration-300 flex flex-col items-center relative overflow-hidden">
+
+            <!-- Mode badge on top right -->
+            <div class="absolute top-4 right-4">
+                <span id="currentModeBadge" class="text-xs px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-medium">Cordas Soltas</span>
+            </div>
+
+            <!-- Challenge Display -->
+            <div class="my-6 text-center">
+                <span class="text-xs tracking-widest text-slate-400 uppercase font-semibold block mb-2">Qual é esta corda?</span>
+
+                <div id="noteDisplayBox" class="flex flex-col items-center justify-center">
+                    <div id="targetNote" class="mono-font text-4xl sm:text-5xl font-black text-white tracking-wide mb-3 drop-shadow-md flex flex-wrap items-baseline justify-center gap-x-3">
+                        <span>MI GRAVE</span><span class="text-sky-400">(E)</span>
+                    </div>
+                    <div id="targetHint" class="text-sm sm:text-base text-slate-400 bg-slate-900/60 px-4 py-1.5 rounded-full border border-slate-800 inline-block">
+                        <i class="fa-solid fa-guitar text-sky-400 mr-1.5"></i> Corda solta | Nota: <span id="noteOctave" class="text-slate-200 font-semibold mono-font">E2</span>
+                    </div>
+                </div>
+
+                <button type="button" onclick="replayNote()" class="mt-5 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm font-semibold text-slate-200 transition active:scale-95 inline-flex items-center gap-2 shadow" title="Repetir som (R)">
+                    <i class="fa-solid fa-volume-high text-sky-400"></i>
+                    <span>Repetir som</span>
+                </button>
+            </div>
+
+            <!-- Visual Feedback Banner inside card -->
+            <div id="feedbackBanner" class="min-h-[3rem] mb-4 flex items-center justify-center text-center font-semibold text-sm sm:text-base transition-all duration-200 opacity-0">
+                <!-- Dynamic text populated by JS -->
+            </div>
+
+            <div class="text-xs text-slate-400 mb-3 text-center">Qual corda é essa?</div>
+
+            <!-- String answer buttons -->
+            <div id="stringButtons" class="w-full max-w-md grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <!-- Dynamic buttons populated via JS -->
+            </div>
+
+            <div class="w-full max-w-md mt-4 flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-500 hidden sm:block">Teclas 1–6 respondem • R repete o som</span>
+                <button type="button" onclick="skipNote()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 px-4 rounded-2xl border border-slate-700 transition ml-auto flex items-center gap-2 text-sm" title="Pular corda">
+                    <i class="fa-solid fa-forward"></i><span>Pular</span>
+                </button>
+            </div>
+
+        </div>
+
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-4 w-full">
+            <button onclick="resetGameStats()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-900/30 border border-slate-700 hover:border-rose-800 text-sm font-semibold text-slate-300 hover:text-rose-300 transition flex items-center gap-2 shadow">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Reiniciar Placar</span>
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-cardBg border border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-guitar text-sky-400"></i> Como funciona o FretNote
+                </h3>
+                <button onclick="closeInfoModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-sm text-slate-300 leading-relaxed">
+                <p>Inspirado no treinamento rítmico de código Morse, o <strong>FretNote Trainer</strong> ajuda você a reconhecer de ouvido e de vista as 6 cordas soltas da guitarra na afinação padrão.</p>
+                <p><strong class="text-sky-400">1.</strong> O sistema sorteia uma corda, mostra o nome da nota e toca o som dela. Use <strong>Repetir som</strong> para ouvir de novo.</p>
+                <p><strong class="text-sky-400">2.</strong> Clique em <strong>1ª a 6ª Corda</strong> (ou aperte <code class="bg-slate-900 px-1.5 py-0.5 rounded text-sky-300 mono-font">1</code> a <code class="bg-slate-900 px-1.5 py-0.5 rounded text-sky-300 mono-font">6</code> no teclado).</p>
+                <p><strong class="text-sky-400">3.</strong> Da mais grossa para a mais fina: 6ª Mi grave (E2), 5ª Lá (A), 4ª Ré (D), 3ª Sol (G), 2ª Si (B), 1ª Mi agudo (E4).</p>
+                <p><strong class="text-sky-400">4.</strong> Atenção: a 6ª e a 1ª são ambas Mi (E), mas com duas oitavas de diferença. Use o som e o texto <em>grave/agudo</em> para diferenciá-las.</p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-800 flex justify-end">
+                <button onclick="closeInfoModal()" class="bg-sky-500 hover:bg-sky-400 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition">
+                    Entendi, Vamos Jogar!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+        <p>Desenvolvido para guitarristas dedicados • Compartilhe no seu grupo e GitHub 🎸</p>
+    </footer>
+
+    <script>
+        // --- GAME STATE & CONFIGURATION ---
+        let score = { correct: 0, wrong: 0, streak: 0, total: 0 };
+
+        let soundEnabled = true;   // string notes (auto-play)
+        let effectsEnabled = true; // correct/wrong sound effects
+        let currentChallenge = null;
+        let isAnsweringLocked = false;
+        let nextTimer = null;
+        let noteTimer = null;
+
+        // Standard tuning, from 6th (lowest) to 1st (highest) string.
+        // freq = open string frequency in Hz; octave distinguishes the two E strings.
+        // file = real recording of the open string, loaded from the sounds/ folder.
+        const guitarStrings = [
+            { number: 6, name: 'Mi grave', openNote: 'E', octave: 2, freq: 82.41,  file: 'sounds/E2.mp3', semitoneOffset: 4 },
+            { number: 5, name: 'Lá',       openNote: 'A', octave: 2, freq: 110.00, file: 'sounds/A2.mp3', semitoneOffset: 9 },
+            { number: 4, name: 'Ré',       openNote: 'D', octave: 3, freq: 146.83, file: 'sounds/D3.mp3', semitoneOffset: 2 },
+            { number: 3, name: 'Sol',      openNote: 'G', octave: 3, freq: 196.00, file: 'sounds/G3.mp3', semitoneOffset: 7 },
+            { number: 2, name: 'Si',       openNote: 'B', octave: 3, freq: 246.94, file: 'sounds/B3.mp3', semitoneOffset: 11 },
+            { number: 1, name: 'Mi agudo', openNote: 'E', octave: 4, freq: 329.63, file: 'sounds/E4.mp3', semitoneOffset: 4 }
+        ];
+
+        const BANNER_BASE = 'min-h-[3rem] mb-4 flex items-center justify-center text-center font-semibold text-sm sm:text-base transition-all duration-200';
+
+        // --- WEB AUDIO API (only for the correct/wrong sound effects) ---
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(freq, type, duration) {
+            if (!effectsEnabled) return;
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = type; // 'sine', 'triangle', 'square'
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.log("Audio playback error:", e);
+            }
+        }
+
+        // --- STRING SOUNDS (real MP3 files from the sounds/ folder) ---
+        const stringAudio = {}; // string number -> HTMLAudioElement
+        let currentStringAudio = null;
+
+        function preloadStringSounds() {
+            guitarStrings.forEach(st => {
+                const audio = new Audio(st.file);
+                audio.preload = 'auto';
+                stringAudio[st.number] = audio;
+                audio.load();
+            });
+        }
+
+        function stopStringSound() {
+            if (currentStringAudio) {
+                currentStringAudio.pause();
+                currentStringAudio.currentTime = 0;
+                currentStringAudio = null;
+            }
+        }
+
+        // Plays the recording of the given string. force = true ignores the "Cordas Off" toggle.
+        function playStringSound(st, force = false) {
+            if (!soundEnabled && !force) return;
+            const audio = stringAudio[st.number];
+            if (!audio) return;
+            stopStringSound();
+            audio.currentTime = 0;
+            currentStringAudio = audio;
+            const p = audio.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(err => {
+                    if (isAnsweringLocked || !currentChallenge || currentChallenge.string !== st) return;
+                    if (err && err.name === 'NotAllowedError') {
+                        // Browsers may block audio until the first interaction
+                        showBanner('🔊 Toque em "Repetir som" para ouvir a corda.', 'text-slate-400');
+                    } else {
+                        showBanner(`⚠️ Não foi possível carregar ${st.file}. Verifique a pasta sounds/.`, 'text-amber-400');
+                    }
+                });
+            }
+        }
+
+        function playSuccessSound() {
+            playTone(587.33, 'triangle', 0.15); // D5
+            setTimeout(() => playTone(880, 'triangle', 0.25), 100); // A5
+        }
+
+        function playErrorSound() {
+            playTone(185.00, 'sawtooth', 0.2); // F#3 low buzz
+            setTimeout(() => playTone(130.81, 'sawtooth', 0.3), 100); // C3 lower buzz
+        }
+
+        // Replay the current string (works even when effects are muted)
+        function replayNote() {
+            if (!currentChallenge) return;
+            playStringSound(currentChallenge.string, true);
+            const banner = document.getElementById('feedbackBanner');
+            if (!isAnsweringLocked) banner.style.opacity = '0';
+        }
+
+        // --- CORE GAME LOGIC ---
+
+        // Pick a random string (never the same one twice in a row)
+        function generateNewChallenge() {
+            clearTimeout(nextTimer);
+            clearTimeout(noteTimer);
+
+            let stringObj;
+            do {
+                stringObj = guitarStrings[Math.floor(Math.random() * guitarStrings.length)];
+            } while (currentChallenge && stringObj === currentChallenge.string);
+
+            currentChallenge = { string: stringObj };
+            renderChallenge();
+
+            // Play the new string automatically
+            noteTimer = setTimeout(() => playStringSound(stringObj), 300);
+        }
+
+        function showBanner(text, colorClass) {
+            const banner = document.getElementById('feedbackBanner');
+            banner.textContent = text;
+            banner.className = `${BANNER_BASE} ${colorClass} opacity-100`;
+        }
+
+        // Update UI with current challenge
+        function renderChallenge() {
+            const s = currentChallenge.string;
+            document.getElementById('targetNote').innerHTML =
+                `<span>${s.name.toUpperCase()}</span><span class="text-sky-400">(${s.openNote})</span>`;
+            document.getElementById('noteOctave').textContent = s.openNote + s.octave;
+
+            // Reset buttons and feedback
+            document.querySelectorAll('.string-btn').forEach(b => b.classList.remove('is-correct', 'is-wrong'));
+            const banner = document.getElementById('feedbackBanner');
+            banner.style.opacity = '0';
+            banner.className = `${BANNER_BASE} opacity-0`;
+            isAnsweringLocked = false;
+        }
+
+        // Handle user answer (1-6)
+        function answerString(number) {
+            if (isAnsweringLocked || !currentChallenge) return;
+            isAnsweringLocked = true;
+            clearTimeout(noteTimer);
+
+            const s = currentChallenge.string;
+            const card = document.getElementById('gameCard');
+            const detail = `Esta é a ${s.number}ª corda — ${s.name} (${s.openNote}).`;
+            const btnOf = n => document.querySelector(`.string-btn[data-string="${n}"]`);
+
+            score.total++;
+
+            if (number === s.number) {
+                score.correct++;
+                score.streak++;
+                playSuccessSound();
+                showBanner(`🎸 Correto! ${detail}`, 'text-emerald-400');
+                btnOf(number).classList.add('is-correct');
+
+                card.classList.add('animate-pop');
+                setTimeout(() => card.classList.remove('animate-pop'), 300);
+                nextTimer = setTimeout(generateNewChallenge, 1300);
+            } else {
+                score.wrong++;
+                score.streak = 0;
+                playErrorSound();
+                showBanner(`❌ Incorreto! ${detail}`, 'text-rose-400');
+                btnOf(number).classList.add('is-wrong');
+                btnOf(s.number).classList.add('is-correct');
+
+                card.classList.add('animate-shake');
+                setTimeout(() => card.classList.remove('animate-shake'), 400);
+                nextTimer = setTimeout(generateNewChallenge, 2000);
+            }
+
+            updateScoreboard();
+        }
+
+        // Skip current string without penalty to streak
+        function skipNote() {
+            if (isAnsweringLocked) return;
+            generateNewChallenge();
+        }
+
+        // Update Scoreboard metrics on screen
+        function updateScoreboard() {
+            document.getElementById('statCorrect').textContent = score.correct;
+            document.getElementById('statWrong').textContent = score.wrong;
+            document.getElementById('statStreak').textContent = score.streak;
+
+            let accuracy = 100;
+            if (score.total > 0) {
+                accuracy = Math.round((score.correct / score.total) * 100);
+            }
+            document.getElementById('statAccuracy').textContent = accuracy + '%';
+        }
+
+        // Reset statistics
+        function resetGameStats() {
+            score = { correct: 0, wrong: 0, streak: 0, total: 0 };
+            updateScoreboard();
+            generateNewChallenge();
+        }
+
+        // Toggle string-note sound On/Off
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            const text = document.getElementById('soundText');
+
+            if (soundEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-sky-400';
+                text.textContent = 'Cordas On';
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-slate-500';
+                text.textContent = 'Cordas Off';
+            }
+        }
+
+        // Toggle correct/wrong sound effects On/Off
+        function toggleEffects() {
+            effectsEnabled = !effectsEnabled;
+            const icon = document.getElementById('effectsIcon');
+            const text = document.getElementById('effectsText');
+
+            if (effectsEnabled) {
+                icon.className = 'fa-solid fa-bell text-sky-400';
+                text.textContent = 'Efeitos On';
+            } else {
+                icon.className = 'fa-solid fa-bell-slash text-slate-500';
+                text.textContent = 'Efeitos Off';
+            }
+        }
+
+        // Build the six big answer buttons (1ª ... 6ª)
+        function buildStringButtons() {
+            const container = document.getElementById('stringButtons');
+            container.innerHTML = '';
+            [...guitarStrings].sort((a, b) => a.number - b.number).forEach(s => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.dataset.string = s.number;
+                btn.className = 'string-btn py-4 sm:py-5 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 border-2 border-slate-700 hover:border-sky-500/60 text-slate-100 font-bold text-base sm:text-lg transition shadow flex items-center justify-center gap-2';
+                btn.innerHTML = `<span class="mono-font text-sky-400">${s.number}ª</span><span>Corda</span>`;
+                btn.onclick = () => answerString(s.number);
+                container.appendChild(btn);
+            });
+        }
+
+        // Modal Controls
+        function openInfoModal() {
+            const modal = document.getElementById('infoModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeInfoModal() {
+            const modal = document.getElementById('infoModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        // Keyboard support: 1-6 (main row or numpad) answer, R repeats the sound
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === 'Escape') { closeInfoModal(); return; }
+            if (!document.getElementById('infoModal').classList.contains('hidden')) return;
+            if (/^[1-6]$/.test(e.key)) {
+                answerString(parseInt(e.key, 10));
+            } else if (e.key === 'r' || e.key === 'R') {
+                replayNote();
+            }
+        });
+
+        // Initialize on window load
+        window.onload = function() {
+            buildStringButtons();
+            preloadStringSounds();
+            generateNewChallenge();
+            updateScoreboard();
+
+            // Click anywhere outside modal to close
+            window.onclick = function(event) {
+                const modal = document.getElementById('infoModal');
+                if (event.target === modal) {
+                    closeInfoModal();
+                }
+            };
+        };
+    </script>
+</body>
+</html>
